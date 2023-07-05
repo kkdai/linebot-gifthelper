@@ -112,12 +112,11 @@ async def handle_callback(request: Request):
         if not isinstance(event.message, TextMessage):
             continue
 
-        result = chain(
-            {"question": event.message.text + "reply in zh-tw"})
+        result = chain({"question": event.message.text})
 
         await line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text=result)
+            TextSendMessage(text="result")
         )
 
     return 'OK'
