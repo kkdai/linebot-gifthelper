@@ -33,12 +33,14 @@ import aiohttp
 
 from fastapi import Request, FastAPI, HTTPException
 
+from dotenv import load_dotenv
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
 from langchain.memory import ConversationBufferMemory
 from langchain.document_loaders import WebBaseLoader
-from langchain.vectorstores import Chroma
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.vectorstores import FAISS
 
 # get channel_secret and channel_access_token from your environment variable
 channel_secret = os.getenv('ChannelSecret', None)
@@ -56,20 +58,18 @@ async_http_client = AiohttpAsyncHttpClient(session)
 line_bot_api = AsyncLineBotApi(channel_access_token, async_http_client)
 parser = WebhookParser(channel_secret)
 
-# Langchain (you must use 0613 model to use OpenAI functions.)
-model = ChatOpenAI(model="gpt-3.5-turbo-0613")
-txt = ""
-loader = WebBaseLoader(
+# Document Loader
+doc = WebBaseLoader(
     "https://gist.githubusercontent.com/kkdai/93ee54d7a03205c54b7dc1cfb262cc62/raw/5c741eec3d523e344104a7081acfbef205de5491/Q&A1.txt")
+documents = doc.load()
 
-pages = loader.load_and_split()
+# Text Splitter
+text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+docs = text_splitter.split_documents(documents)
 
 # Creating embeddings and Vectorization
 embeddings = OpenAIEmbeddings()
-vectordb = Chroma.from_documents(pages,
-                                 embedding=embeddings,
-                                 persist_directory=".")
-vectordb.persist()
+db = FAISS.from_documents(docs, embeddings)
 
 memory = ConversationBufferMemory(memory_key="chat_history",
                                   return_messages=True)
@@ -77,7 +77,7 @@ memory = ConversationBufferMemory(memory_key="chat_history",
 # Querying
 llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-0613")
 chain = ConversationalRetrievalChain.from_llm(llm,
-                                              vectordb.as_retriever(),
+                                              db.as_retriever(),
                                               memory=memory)
 
 
