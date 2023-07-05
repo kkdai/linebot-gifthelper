@@ -75,7 +75,8 @@ memory = ConversationBufferMemory(memory_key="chat_history",
                                   return_messages=True)
 
 # Querying
-llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-0613")
+llm = 
+(temperature=0.9, model="gpt-3.5-turbo-0613")
 chain = ConversationalRetrievalChain.from_llm(llm,
                                               db.as_retriever(),
                                               memory=memory)
@@ -113,7 +114,7 @@ async def handle_callback(request: Request):
         if not isinstance(event.message, TextMessage):
             continue
 
-        result = result = chain(
+        result = chain(
             {"question": event.message.text + "reply in zh-tw"})
 
         await line_bot_api.reply_message(
