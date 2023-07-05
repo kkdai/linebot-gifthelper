@@ -70,7 +70,7 @@ docs = text_splitter.split_documents(documents)
 embeddings = OpenAIEmbeddings()
 db = FAISS.from_documents(docs, embeddings)
 
-memory = ConversationBufferWindowMemory(k=5)
+memory = ConversationBufferWindowMemory(k=5, memory_key="chat_memory")
 
 # Querying
 llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-0613")
