@@ -36,7 +36,7 @@ from fastapi import Request, FastAPI, HTTPException
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.memory import ConversationBufferMemory
+from langchain.memory import ConversationBufferWindowMemory
 from langchain.document_loaders import WebBaseLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import FAISS
@@ -63,15 +63,14 @@ doc = WebBaseLoader(
 documents = doc.load()
 
 # Text Splitter
-text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=0)
 docs = text_splitter.split_documents(documents)
 
 # Creating embeddings and Vectorization
 embeddings = OpenAIEmbeddings()
 db = FAISS.from_documents(docs, embeddings)
 
-memory = ConversationBufferMemory(memory_key="chat_history",
-                                  return_messages=True)
+memory = ConversationBufferWindowMemory(k=5)
 
 # Querying
 llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-0613")
@@ -112,7 +111,7 @@ async def handle_callback(request: Request):
         if not isinstance(event.message, TextMessage):
             continue
 
-        result = chain({"question": event.message.text})
+        result = chain({"question": event.message.text+"reply in zh-tw"})
 
         await line_bot_api.reply_message(
             event.reply_token,
