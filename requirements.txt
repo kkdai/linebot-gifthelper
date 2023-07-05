@@ -6,3 +6,4 @@ openai
 pydantic
 tiktoken
 bs4
+faiss-cpu
