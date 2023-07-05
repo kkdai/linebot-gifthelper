@@ -2,7 +2,7 @@ line-bot-sdk
 fastapi
 uvicorn[standard]
 langchain
-embedchain
 openai
+yfinance
 pydantic
 tiktoken
