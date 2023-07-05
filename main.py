@@ -18,27 +18,27 @@ It uses the embedchain library to handle incoming messages and generate appropri
 
 import os
 import sys
+from linebot import (
+    AsyncLineBotApi, WebhookParser
+)
+from linebot.models import (
+    MessageEvent, TextMessage, TextSendMessage,
+)
+from linebot.exceptions import (
+    InvalidSignatureError
+)
+from linebot.aiohttp_async_http_client import AiohttpAsyncHttpClient
 
 import aiohttp
 
 from fastapi import Request, FastAPI, HTTPException
 
-from embedchain import App
-
-
-from linebot import (
-    AsyncLineBotApi, WebhookParser
-)
-from linebot.aiohttp_async_http_client import AiohttpAsyncHttpClient
-from linebot.exceptions import (
-    InvalidSignatureError
-)
-from linebot.models import (
-    MessageEvent, TextMessage, TextSendMessage,
-)
-
-from dotenv import load_dotenv, find_dotenv
-_ = load_dotenv(find_dotenv())  # read local .env file
+from langchain.chains import ConversationalRetrievalChain
+from langchain.chat_models import ChatOpenAI
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.memory import ConversationBufferMemory
+from langchain.document_loaders import WebBaseLoader
+from langchain.vectorstores import Chroma
 
 # get channel_secret and channel_access_token from your environment variable
 channel_secret = os.getenv('ChannelSecret', None)
@@ -56,12 +56,29 @@ async_http_client = AiohttpAsyncHttpClient(session)
 line_bot_api = AsyncLineBotApi(channel_access_token, async_http_client)
 parser = WebhookParser(channel_secret)
 
-# Embedchain App
-naval_chat_bot = App()
+# Langchain (you must use 0613 model to use OpenAI functions.)
+model = ChatOpenAI(model="gpt-3.5-turbo-0613")
+txt = ""
+loader = WebBaseLoader(
+    "https://gist.githubusercontent.com/kkdai/93ee54d7a03205c54b7dc1cfb262cc62/raw/5c741eec3d523e344104a7081acfbef205de5491/Q&A1.txt")
 
-# Add tools to the app
-naval_chat_bot.add(
-    "web_page", "https://gist.githubusercontent.com/kkdai/93ee54d7a03205c54b7dc1cfb262cc62/raw/5c741eec3d523e344104a7081acfbef205de5491/Q&A1.txt")
+pages = loader.load_and_split()
+
+# Creating embeddings and Vectorization
+embeddings = OpenAIEmbeddings()
+vectordb = Chroma.from_documents(pages,
+                                 embedding=embeddings,
+                                 persist_directory=".")
+vectordb.persist()
+
+memory = ConversationBufferMemory(memory_key="chat_history",
+                                  return_messages=True)
+
+# Querying
+llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-0613")
+chain = ConversationalRetrievalChain.from_llm(llm,
+                                              vectordb.as_retriever(),
+                                              memory=memory)
 
 
 @app.post("/callback")
@@ -96,12 +113,12 @@ async def handle_callback(request: Request):
         if not isinstance(event.message, TextMessage):
             continue
 
-        tool_result = naval_chat_bot.query(
-            event.message.text + " reply in zh-tw, result")
+        result = result = chain(
+            {"question": event.message.text + "reply in zh-tw"})
 
         await line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text=tool_result)
+            TextSendMessage(text=result)
         )
 
     return 'OK'
