@@ -33,7 +33,6 @@ import aiohttp
 
 from fastapi import Request, FastAPI, HTTPException
 
-from dotenv import load_dotenv
 from langchain.chains import ConversationalRetrievalChain
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
@@ -75,8 +74,7 @@ memory = ConversationBufferMemory(memory_key="chat_history",
                                   return_messages=True)
 
 # Querying
-llm = 
-(temperature=0.9, model="gpt-3.5-turbo-0613")
+llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-0613")
 chain = ConversationalRetrievalChain.from_llm(llm,
                                               db.as_retriever(),
                                               memory=memory)
