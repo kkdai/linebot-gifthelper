@@ -44,6 +44,7 @@ from langchain.prompts import PromptTemplate
 # get channel_secret and channel_access_token from your environment variable
 channel_secret = os.getenv('ChannelSecret', None)
 channel_access_token = os.getenv('ChannelAccessToken', None)
+doc_address = os.getenv('DocAddr', None)
 if channel_secret is None:
     print('Specify LINE_CHANNEL_SECRET as environment variable.')
     sys.exit(1)
@@ -58,8 +59,7 @@ line_bot_api = AsyncLineBotApi(channel_access_token, async_http_client)
 parser = WebhookParser(channel_secret)
 
 # Document Loader
-doc = WebBaseLoader(
-    "https://gist.githubusercontent.com/kkdai/93ee54d7a03205c54b7dc1cfb262cc62/raw/5c741eec3d523e344104a7081acfbef205de5491/Q&A1.txt")
+doc = WebBaseLoader(doc_address)
 documents = doc.load()
 
 # Text Splitter
