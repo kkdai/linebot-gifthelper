@@ -33,14 +33,13 @@ import aiohttp
 
 from fastapi import Request, FastAPI, HTTPException
 
-from dotenv import load_dotenv
-from langchain.chains import ConversationalRetrievalChain
+from langchain.chains import RetrievalQA
 from langchain.chat_models import ChatOpenAI
 from langchain.embeddings import OpenAIEmbeddings
-from langchain.memory import ConversationBufferMemory
 from langchain.document_loaders import WebBaseLoader
-from langchain.text_splitter import CharacterTextSplitter
 from langchain.vectorstores import FAISS
+from langchain.text_splitter import CharacterTextSplitter
+from langchain.prompts import PromptTemplate
 
 # get channel_secret and channel_access_token from your environment variable
 channel_secret = os.getenv('ChannelSecret', None)
@@ -64,21 +63,29 @@ doc = WebBaseLoader(
 documents = doc.load()
 
 # Text Splitter
-text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=0)
+text_splitter = CharacterTextSplitter(chunk_size=500, chunk_overlap=0)
 docs = text_splitter.split_documents(documents)
 
 # Creating embeddings and Vectorization
 embeddings = OpenAIEmbeddings()
 db = FAISS.from_documents(docs, embeddings)
 
-memory = ConversationBufferMemory(memory_key="chat_history",
-                                  return_messages=True)
+# Custom Prompts
+PROMPT_TEMPLATE = """Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
+
+{context}
+
+Question: {question}
+Answer reply in zh-tw:"""
+PROMPT = PromptTemplate(
+    template=PROMPT_TEMPLATE, input_variables=["context", "question"]
+)
+chain_type_kwargs = {"prompt": PROMPT}
 
 # Querying
 llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-0613")
-chain = ConversationalRetrievalChain.from_llm(llm,
-                                              db.as_retriever(),
-                                              memory=memory)
+qa = RetrievalQA.from_chain_type(
+    llm=llm, chain_type="stuff", retriever=db.as_retriever(), chain_type_kwargs=chain_type_kwargs)
 
 
 @app.post("/callback")
@@ -113,12 +120,11 @@ async def handle_callback(request: Request):
         if not isinstance(event.message, TextMessage):
             continue
 
-        result = result = chain(
-            {"question": event.message.text + "reply in zh-tw"})
+        result = qa({"query": event.message.text})
 
         await line_bot_api.reply_message(
             event.reply_token,
-            TextSendMessage(text=result)
+            TextSendMessage(text=result["result"])
         )
 
     return 'OK'
