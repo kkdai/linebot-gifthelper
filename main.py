@@ -16,6 +16,8 @@ It uses the embedchain library to handle incoming messages and generate appropri
 #  License for the specific language governing permissions and limitations
 #  under the License.
 
+from langchain.chains import ConversationalRetrievalChain
+from langchain.memory import ConversationBufferMemory
 import os
 import sys
 from linebot import (
@@ -75,21 +77,34 @@ embeddings = OpenAIEmbeddings()
 db = FAISS.from_documents(docs, embeddings)
 
 # Custom Prompts
-PROMPT_TEMPLATE = """Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer.
-
+PROMPT_TEMPLATE = """Use the following pieces of context to answer the question at the end. If you don't know the answer, just say that you don't know, don't try to make up an answer. Use three sentences maximum. Keep the answer as concise as possible. Always say "thanks for asking!" at the end of the answer. 
 {context}
-
 Question: {question}
+Helpful Answer:
 Answer reply in zh-tw:"""
+
 PROMPT = PromptTemplate(
     template=PROMPT_TEMPLATE, input_variables=["context", "question"]
 )
 chain_type_kwargs = {"prompt": PROMPT}
 
+# Memory
+memory = ConversationBufferMemory(
+    memory_key="chat_history",
+    return_messages=True
+)
+
 # Querying
-llm = ChatOpenAI(temperature=0.9, model="gpt-3.5-turbo-0613")
-qa = RetrievalQA.from_chain_type(
-    llm=llm, chain_type="stuff", retriever=db.as_retriever(), chain_type_kwargs=chain_type_kwargs)
+llm = ChatOpenAI(temperature=0.5, model="gpt-3.5-turbo-0613")
+# qa = RetrievalQA.from_chain_type(
+#     llm=llm, chain_type="stuff", retriever=db.as_retriever(), chain_type_kwargs=chain_type_kwargs)
+
+retriever = db.as_retriever()
+qa = ConversationalRetrievalChain.from_llm(
+    llm,
+    retriever=retriever,
+    memory=memory
+)
 
 
 @app.post("/callback")
@@ -124,7 +139,7 @@ async def handle_callback(request: Request):
         if not isinstance(event.message, TextMessage):
             continue
 
-        result = qa({"query": event.message.text})
+        result = qa({"question": event.message.text})
 
         await line_bot_api.reply_message(
             event.reply_token,
